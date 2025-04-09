@@ -1,5 +1,3 @@
-# Oligopoly-model-with-three-time-delays
-# Oligopoly Model with Two Time Delays (Mathematica)
 
 This repository contains a Mathematica implementation of a dynamic Cournot oligopoly model with two discrete time delays.
 
