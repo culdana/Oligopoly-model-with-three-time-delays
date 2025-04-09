@@ -1,0 +1,97 @@
+(* Define the evolution function of the system *)
+Fun[q_] := 
+ Flatten[{q[[1]] + 
+    al*q[[1]]*(a0 - be*q[[1]] - 
+       be*de*Sum[
+         q[[nfirme + T0 + (k - 2)*T1 + 2]], {k, 2, nfirme + 1}]),
+   Table[
+    a1/(2*be) - de/2*q[[nfirme + 2]] - 
+     de/2*Sum[q[[nfirme + T0 + (i - 2)*T2 + 2]], {i, 2, nfirme + 1}] +
+      de/2*q[[nfirme + T0 + (j - 2)*T2 + 2]], {j, 2, nfirme + 1}],
+   Table[q[[nfirme + 2 + j]], {j, 1, T0 - 1}], q[[1]],
+   Table[
+    Append[Table[
+      q[[nfirme + T0 + 2 + (k - 2)*Max[T1, T2] + j]], {j, 1, 
+       Max[{T1, T2}] - 1}], q[[k]]], {k, 2, nfirme + 1}]
+   }]
+
+(* Initial condition: random small values *)
+Q0 = Table[
+  RandomReal[{0, 0.0001}], {k, 1, 
+   nfirme + T0 + nfirme*Max[{T1, T2}] + 1}]
+
+(* Clear parameters for global use *)
+al =.; de =.
+
+(* Same function structure but allows parameter input *)
+F[q_, al_, de_] := 
+ Flatten[{q[[1]] + 
+    al*q[[1]]*(a0 - be*q[[1]] - 
+       be*de*Sum[
+         q[[nfirme + T0 + (k - 2)*T1 + 2]], {k, 2, nfirme + 1}]),
+   Table[
+    a1/(2*be) - de/2*q[[nfirme + 2]] - 
+     de/2*Sum[q[[nfirme + T0 + (i - 2)*T2 + 2]], {i, 2, nfirme + 1}] +
+      de/2*q[[nfirme + T0 + (j - 2)*T2 + 2]], {j, 2, nfirme + 1}],
+   Table[q[[nfirme + 2 + j]], {j, 1, T0 - 1}], q[[1]],
+   Table[
+    Append[Table[
+      q[[nfirme + T0 + 2 + (k - 2)*Max[T1, T2] + j]], {j, 1, 
+       Max[{T1, T2}] - 1}], q[[k]]], {k, 2, nfirme + 1}]
+   }]
+
+(* Compute Jacobian matrix of a list of functions *)
+JacobianMtx[funs_List, vars_List] := Outer[D, funs, vars]
+
+(* Compute Largest Lyapunov Exponents *)
+LCEsD[f_, initcond_, K_, trans_:0] := 
+ Module[{opt, n, a, J, s, q, r, lces},
+  n = Length[initcond];
+  x = Array[a, n];
+  J[y_List] := JacobianMtx[f[x], x] /. Thread[x -> y];
+  x0 = Nest[f, N[initcond], trans];
+  {q, r} = QRDecomposition[J[x0]];
+  s = {};    
+  Do[
+   x0 = f[x0];
+   {q, r} = QRDecomposition[J[x0] . Transpose[q]];
+   s = Append[s, Table[r[[i,i]], {i, n}]],
+   {K}];
+  lces = Sort[Re[Apply[Plus, Log[s]]]/K, Greater];
+  Return[lces]
+  ]
+
+(* Parameters for bifurcation diagram *)
+almax = 1.5;
+al0 = 1;
+M = 500; (* number of steps *)
+trans = 2000; (* transition time, not plotted *)
+Num = 200; (* number of iterations to display *)
+
+(* Compute bifurcation diagram *)
+bif = {};
+For[k = 1, k <= (almax - al0)*M, k++,
+ al = al0 + k/M;
+ Q1 = Nest[Fun, Q0, trans];
+ sol = NestList[Fun, Q1, Num];
+ bif = Join[bif, Table[{al, sol[[k, 1]]}, {k, 1, Num}]]
+ ]
+
+(* Compute Lyapunov exponents *)
+M = 500;
+lyap = {};
+For[k = 1, k <= (almax - al0)*M, k++,
+ al = al0 + k/M;
+ lyap = Append[lyap, {al, LCEsD[Fun, Q0, 2000, 200][[1]]}]
+ ]
+
+(* Plot both bifurcation diagram and Lyapunov exponents *)
+bif23 = ListPlot[bif, PlotRange -> {{1, almax}, All}, Frame -> True, 
+  PlotStyle -> PointSize[0.0017]] 
+
+Show[bif23, 
+ ListPlot[lyap, Joined -> True, PlotStyle -> Pink], 
+ Plot[0, {x, 1, 1.6}, PlotStyle -> {Gray, Thin}], 
+ PlotRange -> All, 
+ PlotLabel ->  "",  
+ FrameLabel -> {"\[Alpha]", "\!\(\*SubscriptBox[\(q\), \(0\)]\)"}]
